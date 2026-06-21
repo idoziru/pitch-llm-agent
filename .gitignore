@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Generated presentation files
+index.html
+style_brief.md
+image_manifest.json
+
+# User wording
+wording/*
+!wording/.gitkeep
+
+# User visual references
+visual_refs/*
+!visual_refs/.gitkeep
+
+# Generated/user images
+imgs/*
+!imgs/.gitkeep
+
+# Exported files
+*.pdf
