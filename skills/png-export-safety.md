@@ -70,27 +70,131 @@ ab-28.png
 
 ---
 
-## html2canvas: критические ограничения
+## html2canvas: что может сломаться
 
-html2canvas не является полноценным браузерным рендерером.
+html2canvas работает иначе, чем браузер. Проблемы возникают при:
 
-Он может ломать:
+- Неправильном flexbox (без `min-height: 0;`)
+- Footer не отрендерилась → нужен fallback
+- Неправильном размере canvas → нужна явная обрезка
+- CSS variables в inline-стилях → html2canvas их не понимает
 
-- flex footer/header;
-- CSS custom properties в inline-стилях;
-- `object-fit: contain`;
-- вложенные flex-контейнеры;
-- overflow на flex-родителях;
-- выравнивание внутри сложных flex-структур.
+---
 
-Поэтому при экспорте:
+## Требования к HTML для export
 
-1. Временно перестраивай slide в `position: relative`.
-2. Header фиксируй через `position: absolute; top: 0`.
-3. Footer фиксируй через `position: absolute; bottom: 0`.
-4. Body фиксируй через `top: header-height` и `bottom: footer-height`.
-5. После рендера обрезай canvas до 1280×720.
-6. После экспорта восстанавливай исходные стили.
+Чтобы export PNG работал БЕЗ ошибок, HTML должен соответствовать этим требованиям:
+
+### 1. Структура слайда — ОБЯЗАТЕЛЬНА
+
+```html
+<div class="slide">
+  <div class="slide-header">...</div>
+  <div class="slide-body">...</div>
+  <div class="slide-footer">...</div>
+</div>
+```
+
+**Если структура другая, export будет ломаться.**
+
+### 2. CSS базовые правила — ОБЯЗАТЕЛЬНЫ
+
+```css
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.slide {
+  width: 1280px;
+  height: 720px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.slide-header {
+  flex-shrink: 0;
+  height: 44px;
+}
+
+.slide-body {
+  flex: 1;
+  min-height: 0;    /* ← КРИТИЧНО */
+  overflow: hidden;
+}
+
+.slide-footer {
+  flex-shrink: 0;
+  height: 40px;
+}
+```
+
+**Без `min-height: 0;` на `.slide-body` контент выедет за пределы при export.**
+
+### 3. Все вложенные контейнеры — ОБЯЗАТЕЛЬНЫ
+
+```css
+.grid, .flex-container, .split-56, .split-60, .grid-3 {
+  min-height: 0;    /* ← КРИТИЧНО */
+  overflow: hidden;
+}
+
+.grid > *, .flex-container > *, .split-56 > *, .split-60 > * {
+  min-height: 0;    /* ← КРИТИЧНО */
+  overflow: hidden;
+}
+```
+
+**Это касается ВСЕХ контейнеров внутри slide-body:**
+- Grid контейнеры
+- Flex контейнеры
+- Split контейнеры (56%, 60%, etc)
+- Карточки с flex-содержимым
+
+### 4. Цвета — ОБЯЗАТЕЛЬНЫ для печати
+
+```css
+.slide, .slide-header, .slide-footer {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+```
+
+Без этого браузер может менять цвета при export.
+
+### 5. Visual slots — ОБЯЗАТЕЛЬНЫ
+
+```css
+.visual-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.visual-slot.has-image {
+  background: transparent;
+}
+
+.visual-slot.has-image .ph-text {
+  display: none;
+}
+```
+
+---
+
+## Чеклист для проверки ДО export
+
+Перед тем, как пользователь экспортирует PNG:
+
+- [ ] Все `.slide` имеют `width: 1280px; height: 720px;`?
+- [ ] `.slide-body` имеет `flex: 1; min-height: 0; overflow: hidden;`?
+- [ ] ВСЕ flex/grid контейнеры внутри body имеют `min-height: 0;`?
+- [ ] Header высота 44px, footer 40px?
+- [ ] Нет inline-стилей с CSS variables (html2canvas их не поймёт)?
+- [ ] Все изображения используют `object-fit: contain;`?
+- [ ] `box-sizing: border-box;` установлен для всех?
+
+**Если хотя бы один пункт не выполнен, export будет ломаться.**
 
 ---
 

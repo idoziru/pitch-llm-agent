@@ -111,6 +111,51 @@ Placeholder должен быть:
 
 ---
 
+## Flexbox — КРИТИЧНО для export
+
+**Обязательные правила** (без них html2canvas ломает layout):
+
+```css
+* { box-sizing: border-box; }
+
+.slide {
+  display: flex;
+  flex-direction: column;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.slide-body {
+  flex: 1;
+  min-height: 0;      /* ← КРИТИЧНО */
+  overflow: hidden;
+}
+
+.slide-header,
+.slide-footer {
+  flex-shrink: 0;     /* ← КРИТИЧНО */
+}
+
+.grid-container {
+  display: grid;
+  min-height: 0;      /* ← КРИТИЧНО */
+}
+
+.grid-container > * {
+  min-height: 0;      /* ← КРИТИЧНО */
+  overflow: hidden;
+}
+```
+
+**Почему это нужно:**
+- `min-height: 0;` заставляет flex-контейнер вычислять высоту правильно
+- Без этого flex-элементы переполняются и overflow не работает
+- html2canvas не понимает `overflow: hidden` без явного `min-height: 0;`
+
+---
+
 ## Не переписывать HTML/CSS без причины
 
 Если нужно изменить один слайд, не меняй всю структуру.
