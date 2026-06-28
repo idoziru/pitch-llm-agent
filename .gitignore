@@ -10,6 +10,10 @@ index.html
 style_brief.md
 image_manifest.json
 
+# User source materials
+materials/*
+!materials/.gitkeep
+
 # User wording
 wording/*
 !wording/.gitkeep

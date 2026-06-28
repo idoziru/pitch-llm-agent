@@ -11,6 +11,7 @@ import os
 import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 PORT = 8000
@@ -40,44 +41,60 @@ def port_is_in_use(port):
         except OSError:
             return True
 
-def kill_existing_process(port):
-    """Kill existing process using the port"""
+def processes_on_port(port):
+    """Return process IDs using the port, if lsof is available."""
     try:
-        # Try lsof (macOS/Linux)
         result = subprocess.run(
             ['lsof', '-ti', f':{port}'],
             capture_output=True,
             text=True
         )
-        if result.stdout.strip():
-            pids = result.stdout.strip().split('\n')
-            for pid in pids:
-                try:
-                    subprocess.run(['kill', '-9', pid])
-                    print(f"✓ Killed existing process (PID: {pid})")
-                except:
-                    pass
-            return True
-    except:
-        pass
-    
-    return False
+        return [pid for pid in result.stdout.strip().split('\n') if pid]
+    except Exception:
+        return []
+
+def confirm_kill_processes(port, pids):
+    """Ask before terminating processes using the port."""
+    if not pids:
+        return False
+
+    print(f"Processes using port {port}: {', '.join(pids)}")
+    if not sys.stdin.isatty():
+        print("Non-interactive terminal: not killing processes automatically.")
+        return False
+
+    answer = input(f"Kill these processes and start the server on port {port}? [y/N]: ").strip().lower()
+    if answer not in ('y', 'yes'):
+        return False
+
+    stopped_any = False
+    for pid in pids:
+        try:
+            subprocess.run(['kill', pid], check=False)
+            print(f"✓ Sent stop signal to process (PID: {pid})")
+            stopped_any = True
+        except Exception as exc:
+            print(f"⚠️  Could not stop process {pid}: {exc}")
+
+    time.sleep(1)
+    return stopped_any
 
 if __name__ == '__main__':
     os.chdir(BASE_DIR)
-    
-    # Check if port is in use and kill existing process
+
+    # Check if port is in use and ask before stopping the existing process.
     if port_is_in_use(PORT):
         print(f"⚠️  Port {PORT} is already in use")
-        if kill_existing_process(PORT):
-            print(f"✓ Old process killed, starting new server...\n")
-            import time
-            time.sleep(1)
-        else:
-            print(f"❌ Could not kill existing process on port {PORT}")
-            print(f"Please run: lsof -ti :{PORT} | xargs kill -9")
+        pids = processes_on_port(PORT)
+        confirm_kill_processes(PORT, pids)
+
+        if port_is_in_use(PORT):
+            print(f"❌ Port {PORT} is still in use")
+            print(f"Stop the process manually or edit PORT in scripts/serve.py")
             sys.exit(1)
-    
+
+        print(f"✓ Port {PORT} is free, starting server...\n")
+
     try:
         with socketserver.TCPServer(("", PORT), CORSRequestHandler) as httpd:
             url = f"http://localhost:{PORT}/index.html"
@@ -85,14 +102,14 @@ if __name__ == '__main__':
             print(f"🚀 Server running at: {url}")
             print(f"{'='*60}\n")
             print("Press Ctrl+C to stop the server\n")
-            
+
             # Open in browser
             try:
                 webbrowser.open(url)
                 print("✓ Browser should open automatically\n")
             except:
                 print(f"⚠️  Please open manually: {url}\n")
-            
+
             try:
                 httpd.serve_forever()
             except KeyboardInterrupt:
