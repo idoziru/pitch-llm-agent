@@ -11,8 +11,8 @@ style_brief.md
 image_manifest.json
 
 # User source materials
-materials/*
-!materials/.gitkeep
+materials_refs/*
+!materials_refs/.gitkeep
 
 # User wording
 wording/*
